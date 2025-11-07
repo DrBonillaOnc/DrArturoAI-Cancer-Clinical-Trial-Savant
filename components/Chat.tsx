@@ -74,7 +74,29 @@ const BotMessage: React.FC<{
         </div>
         <div className="flex items-end gap-2">
             <div className="bg-slate-800/70 backdrop-blur-sm border border-slate-700/50 rounded-lg p-4 max-w-xl shadow-md">
-                <div className="prose text-slate-300" dangerouslySetInnerHTML={{ __html: parseMarkdown(message.text) }}></div>
+                {message.text && (
+                    <div className="prose text-slate-300" dangerouslySetInnerHTML={{ __html: parseMarkdown(message.text) }}></div>
+                )}
+                
+                {(message.imageIsLoading || message.imageUrl || message.imageError) && (
+                    <div className={`mt-3 ${message.text ? 'border-t border-slate-700 pt-3' : ''}`}>
+                        {message.imageIsLoading && (
+                            <div className="flex flex-col items-center justify-center text-slate-400">
+                                <div className="w-8 h-8 border-2 border-blue-400/20 border-t-blue-400 rounded-full animate-spin"></div>
+                                <p className="text-xs mt-2">Generating visual aid...</p>
+                            </div>
+                        )}
+                        {message.imageUrl && (
+                             <img src={message.imageUrl} alt="Generated visual aid" className="rounded-md w-full shadow-lg" />
+                        )}
+                        {message.imageError && (
+                             <div className="text-center text-red-400 text-sm">
+                                <p>{message.imageError}</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {message.sources && message.sources.length > 0 && (
                     <div className="mt-3 border-t border-slate-700 pt-2">
                     <h4 className="text-xs font-semibold mb-1 text-slate-400">Sources:</h4>
@@ -214,6 +236,36 @@ const Chat: React.FC = () => {
         };
     }, []);
 
+    const generateAndAddImage = async (messageId: string, prompt: string) => {
+        try {
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+            const response = await ai.models.generateImages({
+                model: 'imagen-4.0-generate-001',
+                prompt: prompt,
+                config: {
+                  numberOfImages: 1,
+                  outputMimeType: 'image/jpeg',
+                  aspectRatio: '16:9',
+                },
+            });
+            const base64ImageBytes = response.generatedImages[0].image.imageBytes;
+            const imageUrl = `data:image/jpeg;base64,${base64ImageBytes}`;
+    
+            setMessages(prevMessages => prevMessages.map(msg => 
+                msg.id === messageId 
+                ? { ...msg, imageUrl, imageIsLoading: false } 
+                : msg
+            ));
+        } catch (error) {
+            console.error("Image generation failed:", error);
+            setMessages(prevMessages => prevMessages.map(msg => 
+                msg.id === messageId 
+                ? { ...msg, imageIsLoading: false, imageError: "Failed to generate visual aid." } 
+                : msg
+            ));
+        }
+    };
+
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!input.trim() || isLoading) return;
@@ -253,13 +305,27 @@ const Chat: React.FC = () => {
                 config,
             });
 
+            const botText = response.text;
+            const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+            const visualizeTagRegex = /\[VISUALIZE:\s*(.*?)\s*\]/;
+            const match = botText.match(visualizeTagRegex);
+    
             const botMessage: Message = {
                 id: (Date.now() + 1).toString(),
                 sender: 'bot',
-                text: response.text,
-                sources: response.candidates?.[0]?.groundingMetadata?.groundingChunks,
+                text: botText.replace(visualizeTagRegex, '').trim(),
+                sources: groundingChunks,
             };
-            setMessages(prev => [...prev, botMessage]);
+
+            if (match) {
+                botMessage.imageIsLoading = true;
+                const imagePrompt = match[1];
+                setMessages(prev => [...prev, botMessage]);
+                await generateAndAddImage(botMessage.id, imagePrompt);
+            } else {
+                setMessages(prev => [...prev, botMessage]);
+            }
+
         } catch (err) {
             console.error(err);
             setError('Sorry, something went wrong. Please try again.');

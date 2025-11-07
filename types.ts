@@ -6,6 +6,9 @@ export interface Message {
   sender: 'user' | 'bot';
   text: string;
   sources?: GroundingChunk[];
+  imageUrl?: string;
+  imageIsLoading?: boolean;
+  imageError?: string;
 }
 
 export interface TranscriptionTurn {
