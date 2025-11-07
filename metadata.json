@@ -1,0 +1,7 @@
+{
+  "name": "Copy of Massive Bio DrArturoAI Navigator",
+  "description": "A helpful chatbot to explain cancer clinical trials, provide up-to-date information, and offer voice-based interaction and image generation capabilities, powered by Massive Bio.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
