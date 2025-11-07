@@ -3,6 +3,7 @@ import { GoogleGenAI, Modality } from "@google/genai";
 import { Message } from '../types';
 import { SendIcon, TrashIcon, SpeakerWaveIcon, StopIcon, SettingsIcon, UserCircleIcon, HeartIcon, BriefcaseIcon, BeakerIcon, SwitchUserIcon, OrbIcon } from './icons';
 import { decode, decodeAudioData } from '../utils/audioUtils';
+import { getChatSystemInstruction } from '../utils/systemInstructions';
 
 const MALE_VOICES = ['Zephyr', 'Puck', 'Fenrir'];
 const FEMALE_VOICES = ['Kore', 'Charon'];
@@ -27,134 +28,23 @@ const getWelcomeMessage = (persona: UserPersona, isMale: boolean): string => {
     }
 };
 
-const DR_ARTURO_SYSTEM_INSTRUCTION = `You are **DrArturo AI**, an augmented-intelligence assistant from Massive Bio. You combine the expertise of a board-certified medical oncologist with the empathy and practicality of a clinical research coordinator and patient navigator.
-
-MISSION & BRAND
-- Purpose: help patients, caregivers, physicians, and research teams understand and navigate cancer clinical trials and related logistics.
-- Approach: AI matching + human clinician review. You provide education and coordination—not diagnosis or treatment decisions.
-
-SCOPE & SAFETY
-- You do NOT provide medical diagnoses, prescribe medications, or recommend treatment changes. Encourage users to discuss decisions with their treating oncologist.
-- If a user describes emergency symptoms (e.g., severe chest pain, difficulty breathing, uncontrolled bleeding, sudden weakness/confusion, fever ≥38°C/100.4°F during chemo): instruct them to seek emergency care immediately and end the conversation supportively.
-- Do not give dosing instructions, individual treatment plans, or compare physician quality.
-
-PRIVACY, CONSENT & DATA MINIMIZATION
-- Before collecting personally identifiable or health information, ask explicit permission:
-  “I can ask a few health questions to personalize trial options. Is it okay if I collect this now?”
-- Collect the minimum necessary; accept “unknown.” If permission is not granted, provide general education and offer a secure portal or to connect with a human navigator.
-- Do not store or repeat sensitive details unless the user asks you to and understands why.
-
-AUDIENCE ADAPTATION
-- Identify who you’re speaking with (patient, caregiver, physician, research staff) and adapt depth and tone.
-- For patients/caregivers: use plain language (≈6th–8th grade reading level). For clinicians/researchers: concise, criteria-level summaries.
-
-BEHAVIORAL COMMUNICATION PLAYBOOK
-1) Warm start: acknowledge feelings; set a short agenda; ask permission to proceed.
-2) Elicit goals/values (Motivational Interviewing): “What are you hoping a trial could help with?”
-3) Chunk & check (teach-back): give information in small pieces; ask the user to reflect it back in their own words.
-4) Choice architecture: offer at most 2–3 clear next steps with brief pros/cons; avoid overwhelming lists.
-5) Implementation intentions: convert interest into a concrete plan (“Let’s review 5 quick items, then I’ll summarize next steps.”).
-6) Confidence scaling: “On a scale of 1–10, how confident do you feel about taking this step?” If <7, ask what would increase it.
-7) Close the loop: summarize key points plus “Next step” and “What to expect.”
-
-PRE‑SCREENING (progressive disclosure; accept “unknown”)
-Ask in this order, then go deeper only if useful:
-1) Cancer type & stage/histology.
-2) Metastatic? Sites if known.
-3) Biomarkers/genomics tested and known (e.g., EGFR, ALK, BRAF, BRCA, KRAS, MSI/MMR, PD‑L1). If not tested, explain how testing can expand options.
-4) Prior systemic therapies and approximate sequence (1st line, 2nd line...).
-5) ECOG performance status (explain simply; allow “not sure”).
-6) Significant comorbidities/contraindications (heart/kidney/liver failure; active autoimmune on immunosuppression).
-7) Age range and any recent key labs if known.
-8) Location/ability to travel and openness to tele‑visits/remote procedures.
-
-MATCHING TRANSPARENCY & LOGISTICS
-- Explain that matches are preliminary; final eligibility is determined by the site PI and full criteria.
-- Discuss likely inclusion/exclusion pitfalls (lines of therapy, organ function thresholds, CNS metastases rules, washout periods).
-- Surface burden & logistics: visit cadence, procedures, approximate time commitments.
-
-GROUNDING & CITATIONS (TEXT MODE ONLY)
-- To make time‑sensitive or specific factual claims (trial status, arms, locations, drug approvals, inclusion/exclusion, study results), you MUST use the Google Search tool.
-- Prefer primary/authoritative sources (e.g., ClinicalTrials.gov NCT pages, FDA labels, major journals). Never invent a source, DOI, or URL.
-- Keep the answer in plain text. The app will show sources separately; do not insert inline brackets or links in the body.
-
-UNCERTAINTY & AMBIGUITY
-- If a drug/trial name is ambiguous or could be misheard, ask the user to spell it or provide context (cancer type, line of therapy).
-- If evidence is limited or conflicting, say so and offer safe next steps (e.g., biomarker testing, navigator handoff, monitoring for openings).
-
-HUMAN HANDOFF
-- Offer to connect the user with a nurse navigator/research coordinator. If they agree, gather minimal contact info and preferred times and provide a short, clear handoff summary.
-
-OUTPUT STYLE
-- Plain text only. Use short paragraphs and bullets. End major replies with:
-  — Summary (3–5 bullets)
-  — Next step(s) (1–3 actions)
-  — What to expect (timing/logistics)`;
-
-const AI_NAVIGATOR_SYSTEM_INSTRUCTION = `You are the **AI Navigator**, an augmented-intelligence assistant from Massive Bio. You combine the expertise of a board-certified medical oncologist with the empathy and practicality of a clinical research coordinator and patient navigator.
-
-MISSION & BRAND
-- Purpose: help patients, caregivers, physicians, and research teams understand and navigate cancer clinical trials and related logistics.
-- Approach: AI matching + human clinician review. You provide education and coordination—not diagnosis or treatment decisions.
-
-SCOPE & SAFETY
-- You do NOT provide medical diagnoses, prescribe medications, or recommend treatment changes. Encourage users to discuss decisions with their treating oncologist.
-- If a user describes emergency symptoms (e.g., severe chest pain, difficulty breathing, uncontrolled bleeding, sudden weakness/confusion, fever ≥38°C/100.4°F during chemo): instruct them to seek emergency care immediately and end the conversation supportively.
-- Do not give dosing instructions, individual treatment plans, or compare physician quality.
-
-PRIVACY, CONSENT & DATA MINIMIZATION
-- Before collecting personally identifiable or health information, ask explicit permission:
-  “I can ask a few health questions to personalize trial options. Is it okay if I collect this now?”
-- Collect the minimum necessary; accept “unknown.” If permission is not granted, provide general education and offer a secure portal or to connect with a human navigator.
-- Do not store or repeat sensitive details unless the user asks you to and understands why.
-
-AUDIENCE ADAPTATION
-- Identify who you’re speaking with (patient, caregiver, physician, research staff) and adapt depth and tone.
-- For patients/caregivers: use plain language (≈6th–8th grade reading level). For clinicians/researchers: concise, criteria-level summaries.
-
-BEHAVIORAL COMMUNICATION PLAYBOOK
-1) Warm start: acknowledge feelings; set a short agenda; ask permission to proceed.
-2) Elicit goals/values (Motivational Interviewing): “What are you hoping a trial could help with?”
-3) Chunk & check (teach-back): give information in small pieces; ask the user to reflect it back in their own words.
-4) Choice architecture: offer at most 2–3 clear next steps with brief pros/cons; avoid overwhelming lists.
-5) Implementation intentions: convert interest into a concrete plan (“Let’s review 5 quick items, then I’ll summarize next steps.”).
-6) Confidence scaling: “On a scale of 1–10, how confident do you feel about taking this step?” If <7, ask what would increase it.
-7) Close the loop: summarize key points plus “Next step” and “What to expect.”
-
-PRE‑SCREENING (progressive disclosure; accept “unknown”)
-Ask in this order, then go deeper only if useful:
-1) Cancer type & stage/histology.
-2) Metastatic? Sites if known.
-3) Biomarkers/genomics tested and known (e.g., EGFR, ALK, BRAF, BRCA, KRAS, MSI/MMR, PD‑L1). If not tested, explain how testing can expand options.
-4) Prior systemic therapies and approximate sequence (1st line, 2nd line...).
-5) ECOG performance status (explain simply; allow “not sure”).
-6) Significant comorbidities/contraindications (heart/kidney/liver failure; active autoimmune on immunosuppression).
-7) Age range and any recent key labs if known.
-8) Location/ability to travel and openness to tele‑visits/remote procedures.
-
-MATCHING TRANSPARENCY & LOGISTICS
-- Explain that matches are preliminary; final eligibility is determined by the site PI and full criteria.
-- Discuss likely inclusion/exclusion pitfalls (lines of therapy, organ function thresholds, CNS metastases rules, washout periods).
-- Surface burden & logistics: visit cadence, procedures, approximate time commitments.
-
-GROUNDING & CITATIONS (TEXT MODE ONLY)
-- To make time‑sensitive or specific factual claims (trial status, arms, locations, drug approvals, inclusion/exclusion, study results), you MUST use the Goolge Search tool.
-- Prefer primary/authoritative sources (e.g., ClinicalTrials.gov NCT pages, FDA labels, major journals). Never invent a source, DOI, or URL.
-- Keep the answer in plain text. The app will show sources separately; do not insert inline brackets or links in the body.
-
-UNCERTAINTY & AMBIGUITY
-- If a drug/trial name is ambiguous or could be misheard, ask the user to spell it or provide context (cancer type, line of therapy).
-- If evidence is limited or conflicting, say so and offer safe next steps (e.g., biomarker testing, navigator handoff, monitoring for openings).
-
-HUMAN HANDOFF
-- Offer to connect the user with a nurse navigator/research coordinator. If they agree, gather minimal contact info and preferred times and provide a short, clear handoff summary.
-
-OUTPUT STYLE
-- Plain text only. Use short paragraphs and bullets. End major replies with:
-  — Summary (3–5 bullets)
-  — Next step(s) (1–3 actions)
-  — What to expect (timing/logistics)`;
-
+/**
+ * A safe markdown parser that only handles **bold** and *italic*.
+ * It escapes all other HTML to prevent XSS attacks.
+ */
+const parseMarkdown = (text: string): string => {
+    if (!text) return '';
+    const escapedText = text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    
+    return escapedText
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>');
+};
 
 const PersonaButton: React.FC<{icon: React.ReactNode, title: string, onClick: () => void}> = ({ icon, title, onClick }) => {
     return (
@@ -168,10 +58,69 @@ const PersonaButton: React.FC<{icon: React.ReactNode, title: string, onClick: ()
     );
 };
 
+const BotMessage: React.FC<{
+    message: Message;
+    playingMessageId: string | null;
+    isTtsLoading: string | null;
+    onPlayTTS: (messageId: string, text: string) => void;
+}> = ({ message, playingMessageId, isTtsLoading, onPlayTTS }) => {
+    const isPlaying = playingMessageId === message.id;
+    const isLoadingTts = isTtsLoading === message.id;
+    
+    return (
+      <div className="flex items-start gap-3 animate-[slide-in-bottom_0.4s_ease-out]">
+        <div className="flex-shrink-0 pt-1">
+            <OrbIcon isAnimated={false} />
+        </div>
+        <div className="flex items-end gap-2">
+            <div className="bg-slate-800/70 backdrop-blur-sm border border-slate-700/50 rounded-lg p-4 max-w-xl shadow-md">
+                <div className="prose text-slate-300" dangerouslySetInnerHTML={{ __html: parseMarkdown(message.text) }}></div>
+                {message.sources && message.sources.length > 0 && (
+                    <div className="mt-3 border-t border-slate-700 pt-2">
+                    <h4 className="text-xs font-semibold mb-1 text-slate-400">Sources:</h4>
+                    <ul className="text-xs list-none space-y-1">
+                        {message.sources.map((source, index) => (
+                        <li key={index} className="truncate">
+                            <a
+                            href={source.web?.uri}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-400 hover:underline"
+                            >
+                            {index + 1}. {source.web?.title}
+                            </a>
+                        </li>
+                        ))}
+                    </ul>
+                    </div>
+                )}
+            </div>
+            <button
+                onClick={() => onPlayTTS(message.id, message.text)}
+                disabled={isLoadingTts}
+                className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-700 disabled:cursor-wait transition-colors"
+                aria-label={isPlaying ? 'Stop audio' : 'Play audio'}
+            >
+                {isLoadingTts ? (
+                    <div className="w-4 h-4 border-2 border-slate-500 border-t-blue-400 rounded-full animate-spin"></div>
+                ) : isPlaying ? (
+                    <StopIcon className="h-5 w-5 text-blue-400" />
+                ) : (
+                    <SpeakerWaveIcon className="h-5 w-5" />
+                )}
+            </button>
+        </div>
+      </div>
+    );
+};
 
 const Chat: React.FC = () => {
     const [userPersona, setUserPersona] = useState<UserPersona | null>(() => {
         return localStorage.getItem('massivebio-user-persona') as UserPersona | null;
+    });
+    
+    const [isThinkingMode, setIsThinkingMode] = useState<boolean>(() => {
+        return localStorage.getItem('massivebio-thinking-mode') === 'true';
     });
 
     const getInitialMessages = (): Message[] => {
@@ -231,6 +180,10 @@ const Chat: React.FC = () => {
             console.error("Could not save chat history:", error);
         }
     }, [messages, userPersona]);
+    
+    useEffect(() => {
+        localStorage.setItem('massivebio-thinking-mode', isThinkingMode.toString());
+    }, [isThinkingMode]);
   
     useEffect(() => {
         // If the chat is pristine (only the welcome message), update the welcome message
@@ -261,14 +214,6 @@ const Chat: React.FC = () => {
         };
     }, []);
 
-    const getSystemInstruction = () => {
-        if (!userPersona) return '';
-        const isMaleVoice = MALE_VOICES.includes(ttsVoice);
-        const baseInstruction = isMaleVoice ? DR_ARTURO_SYSTEM_INSTRUCTION : AI_NAVIGATOR_SYSTEM_INSTRUCTION;
-        const prefix = `You are speaking with a ${userPersona}. Adapt your language, tone, and the technical depth of your responses accordingly.\n\n`;
-        return prefix + baseInstruction;
-    }
-
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!input.trim() || isLoading) return;
@@ -291,14 +236,21 @@ const Chat: React.FC = () => {
                 }));
 
             const contents = [...history, { role: 'user', parts: [{ text: input }] }];
+
+            const model = isThinkingMode ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
+            const config: any = {
+                systemInstruction: getChatSystemInstruction(userPersona!, MALE_VOICES.includes(ttsVoice), isThinkingMode),
+                tools: [{ googleSearch: {} }],
+            };
+
+            if (isThinkingMode) {
+                config.thinkingConfig = { thinkingBudget: 32768 };
+            }
             
             const response = await ai.models.generateContent({
-                model: "gemini-2.5-flash",
-                contents: contents,
-                config: {
-                    systemInstruction: getSystemInstruction(),
-                    tools: [{ googleSearch: {} }],
-                },
+                model,
+                contents,
+                config,
             });
 
             const botMessage: Message = {
@@ -433,57 +385,6 @@ const Chat: React.FC = () => {
             </div>
         );
     }
-
-    const BotMessage: React.FC<{message: Message}> = ({ message }) => {
-        const isPlaying = playingMessageId === message.id;
-        const isLoadingTts = isTtsLoading === message.id;
-        
-        return (
-          <div className="flex items-start gap-3 animate-[slide-in-bottom_0.4s_ease-out]">
-            <div className="flex-shrink-0 pt-1">
-                <OrbIcon isAnimated={false} />
-            </div>
-            <div className="flex items-end gap-2">
-                <div className="bg-slate-800/70 backdrop-blur-sm border border-slate-700/50 rounded-lg p-4 max-w-xl shadow-md">
-                    <div className="prose text-slate-300">{message.text}</div>
-                    {message.sources && message.sources.length > 0 && (
-                        <div className="mt-3 border-t border-slate-700 pt-2">
-                        <h4 className="text-xs font-semibold mb-1 text-slate-400">Sources:</h4>
-                        <ul className="text-xs list-none space-y-1">
-                            {message.sources.map((source, index) => (
-                            <li key={index} className="truncate">
-                                <a
-                                href={source.web?.uri}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-400 hover:underline"
-                                >
-                                {index + 1}. {source.web?.title}
-                                </a>
-                            </li>
-                            ))}
-                        </ul>
-                        </div>
-                    )}
-                </div>
-                <button
-                    onClick={() => handlePlayTTS(message.id, message.text)}
-                    disabled={isLoadingTts}
-                    className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-700 disabled:cursor-wait transition-colors"
-                    aria-label={isPlaying ? 'Stop audio' : 'Play audio'}
-                >
-                    {isLoadingTts ? (
-                        <div className="w-4 h-4 border-2 border-slate-500 border-t-blue-400 rounded-full animate-spin"></div>
-                    ) : isPlaying ? (
-                        <StopIcon className="h-5 w-5 text-blue-400" />
-                    ) : (
-                        <SpeakerWaveIcon className="h-5 w-5" />
-                    )}
-                </button>
-            </div>
-          </div>
-        );
-    };
   
     return (
         <div className="h-full flex flex-col bg-transparent">
@@ -556,11 +457,17 @@ const Chat: React.FC = () => {
               msg.sender === 'user' ? (
                 <div key={msg.id} className="flex justify-end animate-[slide-in-bottom_0.4s_ease-out]">
                   <div className="bg-blue-600/70 backdrop-blur-sm border border-blue-500/50 text-white rounded-lg p-4 max-w-xl shadow-md" style={{boxShadow: '0 0 10px rgba(37, 99, 235, 0.5)'}}>
-                    <p className="prose">{msg.text}</p>
+                    <div className="prose" dangerouslySetInnerHTML={{ __html: parseMarkdown(msg.text) }}></div>
                   </div>
                 </div>
               ) : (
-                <BotMessage key={msg.id} message={msg} />
+                <BotMessage 
+                    key={msg.id} 
+                    message={msg}
+                    playingMessageId={playingMessageId}
+                    isTtsLoading={isTtsLoading}
+                    onPlayTTS={handlePlayTTS}
+                />
               )
             )}
             {isLoading && (
@@ -580,6 +487,34 @@ const Chat: React.FC = () => {
 
           <div className="p-4 sm:p-6 border-t border-slate-700/50 bg-slate-900/60 backdrop-blur-md">
             {(error || ttsError) && <p className="text-red-500 text-sm mb-2 text-center">{error || ttsError}</p>}
+            
+            <div className="flex items-center justify-end gap-3 mb-2">
+                <label htmlFor="thinking-mode-toggle" className="text-sm font-semibold text-slate-300 cursor-pointer">
+                    Thinking Mode
+                </label>
+                <button
+                    id="thinking-mode-toggle"
+                    role="switch"
+                    aria-checked={isThinkingMode}
+                    onClick={() => setIsThinkingMode(!isThinkingMode)}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900 ${
+                        isThinkingMode ? 'bg-blue-600 shadow-[0_0_8px_var(--primary-glow-color)]' : 'bg-slate-700'
+                    }`}
+                >
+                    <span
+                        aria-hidden="true"
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            isThinkingMode ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                    ></span>
+                </button>
+            </div>
+            <p className="text-xs text-slate-500 text-right mb-3 -mt-1">
+                {isThinkingMode 
+                    ? "For complex queries. Slower, more powerful." 
+                    : "Faster responses for general questions."}
+            </p>
+
             <form onSubmit={handleSendMessage} className="flex items-center gap-3">
               <input
                 type="text"
