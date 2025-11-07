@@ -1,8 +1,7 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI, Modality } from "@google/genai";
 import { Message } from '../types';
-import { SendIcon, TrashIcon, SpeakerWaveIcon, StopIcon, SettingsIcon, UserCircleIcon, HeartIcon, BriefcaseIcon, BeakerIcon, SwitchUserIcon } from './icons';
+import { SendIcon, TrashIcon, SpeakerWaveIcon, StopIcon, SettingsIcon, UserCircleIcon, HeartIcon, BriefcaseIcon, BeakerIcon, SwitchUserIcon, OrbIcon } from './icons';
 import { decode, decodeAudioData } from '../utils/audioUtils';
 
 const MALE_VOICES = ['Zephyr', 'Puck', 'Fenrir'];
@@ -10,13 +9,23 @@ const FEMALE_VOICES = ['Kore', 'Charon'];
 
 type UserPersona = 'Patient' | 'Caregiver' | 'Physician' | 'Researcher';
 
-const DR_ARTURO_WELCOME = `Hello! I am DrArturo AI, your augmented intelligence navigator from Massive Bio. I'm designed to provide in-depth, reliable information about cancer clinical trials, acting as your personal clinical research coordinator, patient navigator, and medical oncologist.
+const getWelcomeMessage = (persona: UserPersona, isMale: boolean): string => {
+    const name = isMale ? 'Dr. Arturo AI' : 'your AI Navigator';
+    const baseIntro = `Hello! I am ${name}, your augmented intelligence navigator from Massive Bio. I'm designed to provide in-depth, reliable information about cancer clinical trials, acting as your personal clinical research coordinator, patient navigator, and medical oncologist.`;
 
-How can I assist you, your patient, or your research team today?`;
-
-const AI_NAVIGATOR_WELCOME = `Hello! I am your AI Navigator from Massive Bio. I'm designed to provide in-depth, reliable information about cancer clinical trials, acting as your personal clinical research coordinator, patient navigator, and medical oncology expert.
-
-How can I assist you, your patient, or your research team today?`;
+    switch (persona) {
+        case 'Patient':
+            return `${baseIntro}\n\nAs a patient, you are at the center of this journey. How can I help you understand your clinical trial options or answer your questions today?`;
+        case 'Caregiver':
+            return `${baseIntro}\n\nI understand the vital role you play as a caregiver. How can I assist you in navigating clinical trials for your loved one?`;
+        case 'Physician':
+            return `${baseIntro}\n\nAs a physician, your time is critical. How can I efficiently help you identify potential clinical trials for your patients or provide specific trial information?`;
+        case 'Researcher':
+            return `${baseIntro}\n\nAs a researcher, you're advancing the future of oncology. How can I assist with your clinical trial information needs today?`;
+        default:
+             return `${baseIntro}\n\nHow can I assist you today?`;
+    }
+};
 
 const DR_ARTURO_SYSTEM_INSTRUCTION = `You are **DrArturo AI**, an augmented-intelligence assistant from Massive Bio. You combine the expertise of a board-certified medical oncologist with the empathy and practicality of a clinical research coordinator and patient navigator.
 
@@ -151,7 +160,7 @@ const PersonaButton: React.FC<{icon: React.ReactNode, title: string, onClick: ()
     return (
         <button
             onClick={onClick}
-            className="group flex flex-col items-center justify-center p-6 sm:p-8 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-blue-500 hover:bg-slate-800 transition-all duration-300 transform hover:-translate-y-1"
+            className="group flex flex-col items-center justify-center p-6 sm:p-8 bg-slate-900/50 backdrop-blur-md rounded-xl border border-slate-700/50 hover:border-blue-500 hover:bg-slate-800/70 transition-all duration-300 transform hover:-translate-y-1 shadow-lg hover:shadow-blue-500/20"
         >
             <div className="mb-4 text-blue-400 group-hover:text-blue-300 transition-colors">{icon}</div>
             <span className="text-lg font-semibold text-slate-200">{title}</span>
@@ -183,7 +192,7 @@ const Chat: React.FC = () => {
         return [{
             id: 'init',
             sender: 'bot',
-            text: isMale ? DR_ARTURO_WELCOME : AI_NAVIGATOR_WELCOME,
+            text: getWelcomeMessage(userPersona, isMale),
         }];
     };
 
@@ -214,8 +223,8 @@ const Chat: React.FC = () => {
     useEffect(() => {
         try {
             if (!userPersona) return;
-            const initialMessageText = messages[0]?.text;
-            if (messages.length > 1 || (initialMessageText !== DR_ARTURO_WELCOME && initialMessageText !== AI_NAVIGATOR_WELCOME)) { 
+            // Only save if there's more than the initial welcome message.
+            if (messages.length > 1) {
                 localStorage.setItem('massivebio-chat-history', JSON.stringify(messages));
             }
         } catch(error) {
@@ -223,6 +232,18 @@ const Chat: React.FC = () => {
         }
     }, [messages, userPersona]);
   
+    useEffect(() => {
+        // If the chat is pristine (only the welcome message), update the welcome message
+        // when the voice (gender) or persona changes.
+        if (userPersona && messages.length === 1 && messages[0].id === 'init') {
+            const isMale = MALE_VOICES.includes(ttsVoice);
+            setMessages([{
+                ...messages[0],
+                text: getWelcomeMessage(userPersona, isMale),
+            }]);
+        }
+    }, [ttsVoice, userPersona]);
+
     useEffect(() => {
         localStorage.setItem('massivebio-tts-voice', ttsVoice);
     }, [ttsVoice]);
@@ -301,13 +322,16 @@ const Chat: React.FC = () => {
         }
     };
   
-    const handleClearHistory = () => {
+    const handleClearHistory = (personaOverride?: UserPersona) => {
+        const currentPersona = personaOverride || userPersona;
+        if (!currentPersona) return;
+
         const isMaleVoice = MALE_VOICES.includes(ttsVoice);
         setMessages([
             {
               id: 'init',
               sender: 'bot',
-              text: isMaleVoice ? DR_ARTURO_WELCOME : AI_NAVIGATOR_WELCOME,
+              text: getWelcomeMessage(currentPersona, isMaleVoice),
             }
         ]);
         localStorage.removeItem('massivebio-chat-history');
@@ -316,7 +340,7 @@ const Chat: React.FC = () => {
     const selectPersona = (persona: UserPersona) => {
         setUserPersona(persona);
         localStorage.setItem('massivebio-user-persona', persona);
-        handleClearHistory(); // Resets and sets welcome message
+        handleClearHistory(persona); // Resets and sets welcome message
     }
 
     const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -395,10 +419,10 @@ const Chat: React.FC = () => {
     
     if (!userPersona) {
         return (
-            <div className="h-full flex flex-col items-center justify-center p-4 sm:p-8 bg-slate-900 animate-[fade-in_0.5s_ease-out]">
-                <div className="text-center">
-                    <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 mb-2">Welcome to the AI Navigator</h2>
-                    <p className="text-slate-400 mb-8 max-w-lg">To personalize your experience, please tell us who you are.</p>
+            <div className="h-full flex flex-col items-center justify-center p-4 sm:p-8 animate-[fade-in_0.5s_ease-out]">
+                <div className="text-center mb-10">
+                    <h2 className="text-3xl sm:text-4xl font-bold text-slate-100 mb-2" style={{textShadow: '0 0 10px rgba(255,255,255,0.2)'}}>Welcome to the AI Navigator</h2>
+                    <p className="text-slate-400 max-w-lg">To provide a personalized experience, please select your role.</p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 w-full max-w-4xl">
                     <PersonaButton icon={<UserCircleIcon className="h-10 w-10" />} title="Patient" onClick={() => selectPersona('Patient')} />
@@ -416,10 +440,12 @@ const Chat: React.FC = () => {
         
         return (
           <div className="flex items-start gap-3 animate-[slide-in-bottom_0.4s_ease-out]">
-            <div className="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center text-white font-bold text-sm">MB</div>
+            <div className="flex-shrink-0 pt-1">
+                <OrbIcon isAnimated={false} />
+            </div>
             <div className="flex items-end gap-2">
-                <div className="bg-slate-800 rounded-lg p-3 max-w-lg shadow-md">
-                    <p className="text-sm text-slate-300" dangerouslySetInnerHTML={{ __html: message.text.replace(/\n/g, '<br />') }}></p>
+                <div className="bg-slate-800/70 backdrop-blur-sm border border-slate-700/50 rounded-lg p-4 max-w-xl shadow-md">
+                    <div className="prose text-slate-300">{message.text}</div>
                     {message.sources && message.sources.length > 0 && (
                         <div className="mt-3 border-t border-slate-700 pt-2">
                         <h4 className="text-xs font-semibold mb-1 text-slate-400">Sources:</h4>
@@ -460,8 +486,8 @@ const Chat: React.FC = () => {
     };
   
     return (
-        <div className="h-full flex flex-col bg-slate-900">
-          <div className="flex-shrink-0 px-4 sm:px-6 py-3 border-b border-slate-700/50">
+        <div className="h-full flex flex-col bg-transparent">
+          <div className="flex-shrink-0 px-4 sm:px-6 py-3 border-b border-slate-700/50 bg-slate-900/60 backdrop-blur-md">
             <div className="flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-slate-200">Chat ({userPersona})</h3>
                 <div className="flex items-center gap-1">
@@ -480,7 +506,7 @@ const Chat: React.FC = () => {
                         <SettingsIcon className="h-5 w-5" />
                     </button>
                     <button 
-                        onClick={handleClearHistory} 
+                        onClick={() => handleClearHistory()} 
                         className="p-1.5 rounded-full text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-colors" 
                         aria-label="Clear chat history"
                     >
@@ -529,8 +555,8 @@ const Chat: React.FC = () => {
             {messages.map((msg) =>
               msg.sender === 'user' ? (
                 <div key={msg.id} className="flex justify-end animate-[slide-in-bottom_0.4s_ease-out]">
-                  <div className="bg-gradient-to-br from-blue-600 to-blue-800 text-white rounded-lg p-3 max-w-lg shadow-md">
-                    <p className="text-sm">{msg.text}</p>
+                  <div className="bg-blue-600/70 backdrop-blur-sm border border-blue-500/50 text-white rounded-lg p-4 max-w-xl shadow-md" style={{boxShadow: '0 0 10px rgba(37, 99, 235, 0.5)'}}>
+                    <p className="prose">{msg.text}</p>
                   </div>
                 </div>
               ) : (
@@ -539,8 +565,8 @@ const Chat: React.FC = () => {
             )}
             {isLoading && (
               <div className="flex items-start gap-3 animate-[slide-in-bottom_0.4s_ease-out]">
-                <div className="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center text-white font-bold text-sm">MB</div>
-                <div className="bg-slate-800 rounded-lg p-3 max-w-lg">
+                <div className="flex-shrink-0 pt-1"><OrbIcon isAnimated={false} /></div>
+                <div className="bg-slate-800/70 backdrop-blur-sm border border-slate-700/50 rounded-lg p-3 max-w-lg">
                   <div className="flex items-center gap-2">
                       <div className="h-2 w-2 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
                       <div className="h-2 w-2 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
@@ -552,7 +578,7 @@ const Chat: React.FC = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="p-4 sm:p-6 border-t border-slate-700/50 bg-slate-900">
+          <div className="p-4 sm:p-6 border-t border-slate-700/50 bg-slate-900/60 backdrop-blur-md">
             {(error || ttsError) && <p className="text-red-500 text-sm mb-2 text-center">{error || ttsError}</p>}
             <form onSubmit={handleSendMessage} className="flex items-center gap-3">
               <input
@@ -560,13 +586,13 @@ const Chat: React.FC = () => {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Ask about clinical trials..."
-                className="flex-1 w-full px-4 py-2 bg-slate-800 text-slate-200 placeholder-slate-500 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 w-full px-4 py-2 bg-slate-800/70 text-slate-200 placeholder-slate-500 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 border border-slate-700 transition-shadow duration-300 focus:shadow-[0_0_15px_var(--primary-glow-color)]"
                 disabled={isLoading}
               />
               <button
                 type="submit"
                 disabled={isLoading || !input.trim()}
-                className="flex-shrink-0 w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center disabled:bg-slate-600 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors"
+                className="flex-shrink-0 w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center disabled:bg-slate-600 disabled:cursor-not-allowed hover:bg-blue-700 transition-all duration-300 shadow-lg hover:shadow-blue-500/40 focus:outline-none focus:ring-2 ring-offset-2 ring-offset-slate-900 ring-blue-500"
               >
                 <SendIcon />
               </button>

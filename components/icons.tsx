@@ -79,3 +79,20 @@ export const SwitchUserIcon: React.FC<{className?: string}> = ({className}) => (
       <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.664 0l3.181-3.183m-11.664 0l3.181-3.183a8.25 8.25 0 00-11.664 0l3.181 3.183" />
     </svg>
 );
+
+export const OrbIcon: React.FC<{isAnimated?: boolean; className?: string}> = ({ isAnimated = true, className = '' }) => (
+    <div className={`relative h-8 w-8 ${className}`}>
+        <div 
+            className="absolute inset-0 rounded-full border border-cyan-400/50"
+            style={{ animation: isAnimated ? 'orb-rotate-1 10s linear infinite' : 'none' }}
+        ></div>
+        <div 
+            className="absolute inset-1 rounded-full border border-blue-500/50"
+            style={{ animation: isAnimated ? 'orb-rotate-2 8s linear infinite' : 'none' }}
+        ></div>
+        <div 
+            className="absolute inset-2.5 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-full"
+            style={{ boxShadow: '0 0 10px var(--primary-glow-color)' }}
+        ></div>
+    </div>
+);

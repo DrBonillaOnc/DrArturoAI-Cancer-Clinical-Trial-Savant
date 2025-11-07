@@ -5,10 +5,45 @@ import { MicrophoneIcon, StopIcon, TrashIcon } from './icons';
 import { decode, createBlob, decodeAudioData } from '../utils/audioUtils';
 import { TranscriptionTurn } from '../types';
 
+const Orb: React.FC<{ state: 'idle' | 'connecting' | 'listening' | 'speaking' | 'error' }> = ({ state }) => {
+    const getCoreStateClasses = () => {
+        switch (state) {
+            case 'connecting':
+                return 'animate-spin';
+            case 'listening':
+                return 'scale-110 shadow-cyan-400/50';
+            case 'speaking':
+                return 'scale-105 shadow-blue-400/50';
+            case 'error':
+                return 'shadow-red-500/50';
+            default: // idle
+                return 'shadow-slate-700/50';
+        }
+    };
+
+    return (
+        <div className="relative w-48 h-48 sm:w-64 sm:h-64 flex items-center justify-center">
+            {/* Outer rings */}
+            <div className={`absolute inset-0 rounded-full border-2 border-cyan-400/30 transition-all duration-500 ${state === 'listening' ? 'animate-[orb-rotate-1_5s_linear_infinite]' : 'animate-[orb-rotate-1_20s_linear_infinite]'}`}></div>
+            <div className={`absolute inset-4 rounded-full border-2 border-blue-500/30 transition-all duration-500 ${state === 'speaking' ? 'animate-[orb-rotate-2_8s_linear_infinite]' : 'animate-[orb-rotate-2_15s_linear_infinite]'}`}></div>
+            
+            {/* Core */}
+            <div className={`absolute inset-10 rounded-full bg-slate-900 transition-transform duration-500 ease-in-out shadow-2xl ${getCoreStateClasses()}`}>
+                <div 
+                    className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-600 to-cyan-500 opacity-60"
+                    style={{ animation: (state === 'speaking' || state === 'listening') ? 'orb-breathe 2s ease-in-out infinite' : 'none' }}
+                ></div>
+            </div>
+        </div>
+    );
+};
+
+
 const VoiceChat: React.FC = () => {
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [status, setStatus] = useState('Idle. Press Start to talk.');
+  const [status, setStatus] = useState('Idle. Press the orb to begin.');
+  const [orbState, setOrbState] = useState<'idle' | 'connecting' | 'listening' | 'speaking' | 'error'>('idle');
 
   const [transcriptionHistory, setTranscriptionHistory] = useState<TranscriptionTurn[]>(() => {
     try {
@@ -40,6 +75,24 @@ const VoiceChat: React.FC = () => {
   // Keep authoritative copies of the current turn text to avoid setState race
   const currentInputRef = useRef('');
   const currentOutputRef = useRef('');
+
+  useEffect(() => {
+    if (isConnecting) {
+      setOrbState('connecting');
+    } else if (isSessionActive) {
+      if (currentOutputRef.current.length > 0) {
+        setOrbState('speaking');
+      } else {
+        setOrbState('listening');
+      }
+    } else {
+      if (status.toLowerCase().includes('error')) {
+        setOrbState('error');
+      } else {
+        setOrbState('idle');
+      }
+    }
+  }, [isConnecting, isSessionActive, status, currentOutput]);
 
   useEffect(() => {
     try {
@@ -80,7 +133,7 @@ const VoiceChat: React.FC = () => {
   const startSession = async () => {
     if (isSessionActive || isConnecting) return;
     setIsConnecting(true);
-    setStatus('Connecting…');
+    setStatus('Initializing AI Core…');
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -172,7 +225,7 @@ OUTPUT STYLE
           onopen: async () => {
             setIsSessionActive(true);
             setIsConnecting(false);
-            setStatus('Connected! You can start speaking now.');
+            setStatus('Connection established. Listening…');
 
             mediaStreamSource.current = inputAudioContext.current!.createMediaStreamSource(stream);
             scriptProcessor.current = inputAudioContext.current!.createScriptProcessor(4096, 1, 1);
@@ -229,6 +282,7 @@ OUTPUT STYLE
     if (sc?.outputTranscription?.text) {
       currentOutputRef.current += sc.outputTranscription.text;
       setCurrentOutput(currentOutputRef.current);
+      setStatus('AI is responding…');
     }
 
     const base64Audio = message.data;
@@ -268,6 +322,7 @@ OUTPUT STYLE
       currentOutputRef.current = '';
       setCurrentInput('');
       setCurrentOutput('');
+      setStatus('Listening…');
     }
   };
 
@@ -282,7 +337,7 @@ OUTPUT STYLE
       cleanup();
       setIsSessionActive(false);
       setIsConnecting(false);
-      setStatus('Idle. Press Start to talk.');
+      setStatus('Idle. Press the orb to begin.');
     }
   };
 
@@ -301,69 +356,55 @@ OUTPUT STYLE
   }, []);
 
   return (
-    <div className="h-full flex flex-col items-center justify-center p-4 sm:p-6 bg-slate-950 text-center animate-[fade-in_0.5s_ease-out]">
-      <div className="w-full max-w-2xl h-full flex flex-col">
-        <div className="mb-6 text-left">
-          <div className="flex justify-between items-center mb-1">
-            <h2 className="text-2xl font-bold text-slate-200">Voice Conversation</h2>
+    <div className="h-full flex flex-col items-center justify-center p-4 sm:p-6 text-center animate-[fade-in_0.5s_ease-out]">
+      <div className="w-full max-w-4xl h-full flex flex-col">
+        {/* Transcription Panel */}
+        <div 
+          className="relative flex-1 bg-slate-900/50 backdrop-blur-md border border-slate-700/50 rounded-xl p-4 overflow-y-auto space-y-4 text-left shadow-2xl mb-6"
+          style={{
+            boxShadow: '0 0 40px rgba(37, 99, 235, 0.2), inset 0 0 15px rgba(37, 99, 235, 0.2)'
+          }}
+        >
+          <div className="absolute top-3 right-3 z-10">
             <button
               onClick={handleClearHistory}
-              className="p-1.5 rounded-full text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-colors"
+              className="p-1.5 rounded-full text-slate-400 hover:text-red-400 bg-slate-800/50 hover:bg-slate-700 transition-colors"
               aria-label="Clear voice history"
             >
               <TrashIcon className="h-5 w-5" />
             </button>
           </div>
-          <p className="text-slate-400">{status}</p>
-        </div>
-
-        <div className="flex-1 bg-slate-900 rounded-lg p-4 overflow-y-auto space-y-4 text-left shadow-inner">
           {transcriptionHistory.length === 0 && !currentInput && !currentOutput && (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-slate-500">Your conversation transcript will appear here.</p>
+            <div className="flex flex-col items-center justify-center h-full text-slate-500">
+                <p className="text-lg">Conversation transcript will appear here.</p>
+                <p className="text-sm">Press the orb to begin.</p>
             </div>
           )}
           {transcriptionHistory.map((turn) => (
             <div key={turn.id} className="animate-[slide-in-bottom_0.4s_ease-out]">
-              <p><strong className="text-blue-400">You:</strong> {turn.userInput}</p>
-              <p><strong className="text-cyan-400">Bot:</strong> {turn.modelOutput}</p>
+              <p className="text-slate-300"><strong className="font-semibold text-blue-400">You:</strong> {turn.userInput}</p>
+              <p className="mt-1"><strong className="font-semibold text-cyan-400">AI:</strong> {turn.modelOutput}</p>
             </div>
           ))}
           {(currentInput || currentOutput) && (
-            <div>
-              <p>
-                <strong className="text-blue-400">You:</strong> {currentInput}
-                <span className="inline-block w-2 h-4 bg-slate-500 animate-pulse ml-1"></span>
-              </p>
-              <p>
-                <strong className="text-cyan-400">Bot:</strong> {currentOutput}
-                {currentOutput && (
-                  <span className="inline-block w-2 h-4 bg-slate-500 animate-pulse ml-1"></span>
-                )}
-              </p>
+            <div className="pt-2 border-t border-slate-700/50">
+              {currentInput && <p className="text-slate-300"><strong className="font-semibold text-blue-400">You:</strong> {currentInput}<span className="inline-block w-2 h-4 bg-slate-400 animate-pulse ml-1"></span></p>}
+              {currentOutput && <p className="mt-1"><strong className="font-semibold text-cyan-400">AI:</strong> {currentOutput}<span className="inline-block w-2 h-4 bg-slate-400 animate-pulse ml-1"></span></p>}
             </div>
           )}
         </div>
 
-        <div className="mt-6 flex justify-center">
-          {!isSessionActive ? (
-            <button
-              onClick={startSession}
-              disabled={isConnecting}
-              className="flex items-center gap-3 px-8 py-4 bg-blue-600 disabled:opacity-60 text-white rounded-full text-lg font-semibold hover:bg-blue-700 transition-all duration-200 shadow-lg transform hover:scale-105"
-            >
-              <MicrophoneIcon className="h-6 w-6" />
-              {isConnecting ? 'Connecting…' : 'Start Conversation'}
+        {/* Orb and controls */}
+        <div className="flex flex-col items-center justify-center">
+            <p className="text-slate-400 h-6 mb-4 transition-opacity duration-300">{status}</p>
+            <button onClick={isSessionActive ? stopSession : startSession} disabled={isConnecting} className="group rounded-full focus:outline-none focus-visible:ring-4 ring-blue-500/50 relative">
+              <Orb state={orbState} />
+              <div className="absolute inset-0 flex items-center justify-center">
+                  {!isSessionActive ? 
+                    <MicrophoneIcon className={`h-12 w-12 text-slate-400 group-hover:text-white transition-colors duration-300 ${isConnecting ? 'opacity-0' : 'opacity-100'}`} /> : 
+                    <StopIcon className="h-12 w-12 text-slate-400 group-hover:text-white transition-colors duration-300" />}
+              </div>
             </button>
-          ) : (
-            <button
-              onClick={stopSession}
-              className="flex items-center gap-3 px-8 py-4 bg-red-600 text-white rounded-full text-lg font-semibold hover:bg-red-700 transition-all duration-200 shadow-lg transform hover:scale-105"
-            >
-              <StopIcon className="h-6 w-6" />
-              Stop Conversation
-            </button>
-          )}
         </div>
       </div>
     </div>

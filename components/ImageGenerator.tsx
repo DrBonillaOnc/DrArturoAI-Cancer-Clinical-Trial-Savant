@@ -46,9 +46,18 @@ const ImageGenerator: React.FC = () => {
   ];
 
   return (
-    <div className="h-full flex flex-col md:flex-row bg-slate-950 animate-[fade-in_0.5s_ease-out]">
-      <div className="w-full md:w-1/3 p-4 sm:p-6 border-b md:border-b-0 md:border-r border-slate-700/50 flex flex-col">
-        <h2 className="text-2xl font-bold mb-4 text-slate-200">Image Generation</h2>
+    <div className="h-full flex flex-col md:flex-row bg-transparent animate-[fade-in_0.5s_ease-out] gap-6 p-4">
+      <div 
+        className="w-full md:w-1/3 p-6 rounded-xl flex flex-col"
+        style={{
+          background: 'rgba(15, 23, 42, 0.6)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          border: '1px solid var(--glass-border)',
+          boxShadow: '0 0 30px rgba(0,0,0,0.2)'
+        }}
+      >
+        <h2 className="text-2xl font-bold mb-4 text-slate-200" style={{textShadow: '0 0 5px var(--secondary-glow-color)'}}>Image Generation</h2>
         <div className="space-y-4 flex-grow flex flex-col">
           <div>
             <label htmlFor="prompt" className="block text-sm font-medium text-slate-400">Prompt</label>
@@ -57,7 +66,7 @@ const ImageGenerator: React.FC = () => {
               rows={5}
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              className="mt-1 block w-full bg-slate-800 text-slate-200 rounded-md border-slate-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              className="mt-1 block w-full bg-slate-800/70 text-slate-200 rounded-md border-slate-600 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm transition-shadow duration-300 focus:shadow-[0_0_15px_var(--primary-glow-color)]"
               placeholder="e.g., A robot holding a red skateboard."
             />
           </div>
@@ -67,7 +76,7 @@ const ImageGenerator: React.FC = () => {
               id="aspectRatio"
               value={aspectRatio}
               onChange={(e) => setAspectRatio(e.target.value as any)}
-              className="mt-1 block w-full bg-slate-800 text-slate-200 rounded-md border-slate-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              className="mt-1 block w-full bg-slate-800/70 text-slate-200 rounded-md border-slate-600 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm"
             >
               {aspectRatios.map(ar => <option key={ar.value} value={ar.value}>{ar.label} ({ar.value})</option>)}
             </select>
@@ -76,13 +85,22 @@ const ImageGenerator: React.FC = () => {
           <button
             onClick={handleGenerate}
             disabled={isLoading}
-            className="w-full py-3 px-4 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+            className="w-full py-3 px-4 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-all duration-300 shadow-lg hover:shadow-blue-500/40"
           >
             {isLoading ? 'Generating...' : 'Generate Image'}
           </button>
         </div>
       </div>
-      <div className="flex-1 p-4 sm:p-6 flex items-center justify-center bg-slate-900">
+      <div 
+        className="flex-1 rounded-xl flex items-center justify-center"
+        style={{
+            background: 'rgba(15, 23, 42, 0.6)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border: '1px solid var(--glass-border)',
+            boxShadow: '0 0 30px rgba(0,0,0,0.2)'
+        }}
+      >
         {isLoading && (
           <div className="text-center">
             <div className="w-16 h-16 border-4 border-blue-400/20 border-t-blue-400 rounded-full animate-spin"></div>

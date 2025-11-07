@@ -20,37 +20,103 @@
 }
 </script>
 <style>
+  :root {
+    --bg-color: #020617; /* slate-950 */
+    --primary-glow-color: #2563eb; /* blue-600 */
+    --secondary-glow-color: #0891b2; /* cyan-600 */
+    --glass-bg: rgba(15, 23, 42, 0.6); /* slate-900 @ 60% */
+    --glass-border: rgba(51, 65, 85, 0.5); /* slate-700 @ 50% */
+    --text-primary: #e2e8f0; /* slate-200 */
+    --text-secondary: #94a3b8; /* slate-400 */
+  }
+
   body {
     font-family: 'Inter', sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    overflow: hidden;
   }
+
+  #root {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+  }
+  
+  #root::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image: 
+      linear-gradient(var(--glass-border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--glass-border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    z-index: -2;
+    animation: pan-grid 60s linear infinite;
+  }
+
+  #root::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(circle at 50% 50%, rgba(37, 99, 235, 0.15) 0%, transparent 40%);
+    z-index: -1;
+    animation: pulse-glow 10s ease-in-out infinite;
+  }
+
+  .prose {
+    font-size: 1rem;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  }
+
+  @keyframes pan-grid {
+    0% { background-position: 0 0; }
+    100% { background-position: 40px 40px; }
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { transform: scale(1); opacity: 0.6; }
+    50% { transform: scale(1.5); opacity: 0.8; }
+  }
+
   @keyframes slide-in-bottom {
     from {
       opacity: 0;
-      transform: translateY(15px);
+      transform: translateY(25px) scale(0.95);
     }
     to {
       opacity: 1;
-      transform: translateY(0);
+      transform: translateY(0) scale(1);
     }
   }
+  
   @keyframes fade-in {
     from { opacity: 0; }
     to { opacity: 1; }
   }
-  /* Custom scrollbar for a modern look */
-  ::-webkit-scrollbar {
-    width: 8px;
+  
+  @keyframes orb-rotate-1 {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
   }
-  ::-webkit-scrollbar-track {
-    background: #0f172a; /* slate-900 */
+  @keyframes orb-rotate-2 {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(-360deg); }
   }
-  ::-webkit-scrollbar-thumb {
-    background: #334155; /* slate-700 */
-    border-radius: 4px;
+  @keyframes orb-breathe {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 20px var(--primary-glow-color), 0 0 40px var(--primary-glow-color); }
+    50% { transform: scale(1.05); box-shadow: 0 0 30px var(--primary-glow-color), 0 0 60px var(--primary-glow-color); }
   }
-  ::-webkit-scrollbar-thumb:hover {
-    background: #475569; /* slate-600 */
-  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--secondary-glow-color); }
 </style>
 </head>
 <body class="bg-slate-950 text-slate-300">
